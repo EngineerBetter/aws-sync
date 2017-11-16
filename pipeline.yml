@@ -1,0 +1,47 @@
+---
+resources:
+- name: every-30-minutes
+  type: time
+  source:
+    interval: ((interval))
+
+jobs:
+- name: sync-buckets
+  plan:
+  - get: every-30-minutes
+    trigger: true
+  - task: sync
+    config:
+      platform: linux
+      image_resource:
+        type: docker-image
+        source:
+          repository: engineerbetter/pcf-ops
+          tag: latest
+      run:
+        path: bash
+        args:
+        - -euc
+        - |
+          mkdir -p tmp
+          echo "Copy from source bucket to local"
+          AWS_REGION="${AWS_REGION_SOURCE}" \
+            AWS_ACCESS_KEY_ID="${AWS_ACCESS_KEY_ID_SOURCE}" \
+            AWS_SECRET_ACCESS_KEY="${AWS_SECRET_ACCESS_KEY_SOURCE}" \
+            aws s3 sync s3://${SOURCE_BUCKET} tmp/ --exclude "*" --include "${MATCHER}"
+
+          echo "Sync local copy with destination bucket"
+          AWS_REGION="${AWS_REGION_DESTINATION}" \
+            AWS_ACCESS_KEY_ID="${AWS_ACCESS_KEY_ID_DESTINATION}" \
+            AWS_SECRET_ACCESS_KEY="${AWS_SECRET_ACCESS_KEY_DESTINATION}" \
+            aws s3 sync tmp/ s3://${DESTINATION_BUCKET}  --exclude "*" --include "${MATCHER}"
+    params:
+      SOURCE_BUCKET: ((source_bucket))
+      AWS_REGION_SOURCE: ((region_source))
+      AWS_ACCESS_KEY_ID_SOURCE: ((s3_access_key_source))
+      AWS_SECRET_ACCESS_KEY_SOURCE: ((s3_secret_key_source))
+      DESTINATION_BUCKET: ((destination_bucket))
+      AWS_REGION_DESTINATION: ((region_destination))
+      AWS_ACCESS_KEY_ID_DESTINATION: ((s3_access_key_destination))
+      AWS_SECRET_ACCESS_KEY_DESTINATION: ((s3_secret_key_destination))
+      MATCHER: ((matcher))
